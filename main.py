@@ -1,3 +1,4 @@
+import pandas as pd
 from fastapi import FastAPI
 from pymongo import MongoClient
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -24,6 +25,8 @@ class Transaction(BaseModel):
     has_cbk: bool
 
 async def analyze_transaction(transaction: Transaction):
+    result = {"recommendation": "Approve"}
+    
     # Checks if transaction is already in the database
     if await db.transactions.find_one({"transaction_id": transaction.transaction_id}):
         return {"error": "Transaction already in database"}
@@ -38,12 +41,32 @@ async def analyze_transaction(transaction: Transaction):
             result["recommendation"] = "Deny"
             result["reason"] = "Previous chargeback history"
     
+    # Too many transactions in a row
+    # Fetch recent transactions for the user from the database
+    recent_transactions = await db.transactions.find({
+        "user_id": transaction.user_id
+        }).sort("transaction_date", -1).to_list(length=None) 
     
+    # If recent transactions exist, perform analysis
+    if recent_transactions:
+        df = pd.DataFrame(recent_transactions) 
+        df['transaction_date'] = pd.to_datetime(df['transaction_date'])
+        df_sorted = df.sort_values(['user_id', 'transaction_date'])
+        df_sorted['time_diff'] = df_sorted.groupby('user_id')['transaction_date'].diff()
+        transactions_within_2min = df_sorted[df_sorted['time_diff'] < pd.Timedelta(minutes=2)]
+
+        # If there are transactions within 2 minutes, trigger the rule
+        if not transactions_within_2min.empty: 
+            result["recommendation"] = "Deny"
+            result["reason"] = "Too many transactions in a short period"
     
     # Record the transaction in the "transactions" collection
     await db.transactions.insert_one(transaction.model_dump())
     
-    result = {"recommendation": "Approve"}
+    # If transaction was fraudulent, add it to the "chargebacks" collection
+    if result["recommendation"] == "Deny":
+        await db.chargebacks.insert_one(transaction.model_dump())
+    
     return transaction, result
 
 @app.post("/analyze_transaction/")
