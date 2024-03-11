@@ -17,6 +17,14 @@ class Transaction(BaseModel):
     transaction_amount: float
     device_id: int
     has_cbk: bool
+    
+async def analyze_transaction(transaction: Transaction):
+    result = {"recommendation": "Approve"}
+    return transaction, result
+
+@app.post("/analyze_transaction/")
+async def analyze_single(transaction: Transaction):
+    return await analyze_transaction(transaction)
 
 @app.get("/")
 async def root():
