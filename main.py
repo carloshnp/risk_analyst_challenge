@@ -2,9 +2,7 @@ import pandas as pd
 from fastapi import FastAPI
 from pymongo import MongoClient
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel
-from typing import Union
-import datetime
+from models import Transaction
 
 app = FastAPI()
 client = AsyncIOMotorClient("mongodb://db:27017/")
@@ -13,16 +11,6 @@ db = client['risk_analysis_db']
 # Access your collections
 chargebacks = db['chargebacks']
 transactions = db['transactions']
-# Schema
-class Transaction(BaseModel):
-    transaction_id: int
-    merchant_id: int
-    user_id: int
-    card_number: str
-    transaction_date: datetime.datetime
-    transaction_amount: float
-    device_id: int
-    has_cbk: bool
 
 async def analyze_transaction(transaction: Transaction):
     transaction_result = {"recommendation": "Approve"}
