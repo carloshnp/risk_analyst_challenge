@@ -104,6 +104,29 @@ async def analyze_transaction(transaction: Transaction):
     if transaction.device_id == -1:
         transaction_result["recommendation"] = "Deny"
         transaction_result["reason"] = "Missing device ID (potential fraud)"
+        
+    ## Card Testing (small time and amount differences from transactions)
+    recent_transactions = await db.transactions.find({
+        "user_id": transaction.user_id
+        }).sort("transaction_date", -1).to_list(length=None) 
+    
+    if recent_transactions:
+        df = pd.DataFrame(recent_transactions) 
+        df['transaction_date'] = pd.to_datetime(df['transaction_date'])
+
+        # Calculates the time and amount differences between transactions
+        df_sorted = df.sort_values(['user_id', 'transaction_date', 'transaction_amount'])
+        df_sorted['time_diff'] = df_sorted.groupby('user_id')['transaction_date'].diff() 
+        df_sorted['amount_diff'] = df_sorted.groupby('user_id')['transaction_amount'].diff()
+
+        transactions_within_5min_diff_10 = df_sorted[
+            (df_sorted['time_diff'] <= pd.Timedelta(minutes=10)) & 
+            (df_sorted['amount_diff'].abs() < 10)
+        ]
+
+        if not transactions_within_5min_diff_10.empty: 
+            transaction_result["recommendation"] = "Deny" 
+            transaction_result["reason"] = "Potential card testing (small time and amount differences)"
 
     
     ### REPOSITORY
