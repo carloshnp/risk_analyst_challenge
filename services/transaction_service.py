@@ -59,7 +59,6 @@ class TransactionService:
             df = pd.DataFrame(recent_transactions) 
             df['transaction_date'] = pd.to_datetime(df['transaction_date'])
 
-            # Sort before subsequent operations (Corrected)
             df = df.sort_values(by=['transaction_date'], ascending=False)  
 
             # Calculate a week-long interval centered around the transaction date
@@ -101,11 +100,10 @@ class TransactionService:
             df = pd.DataFrame(recent_transactions)
             df['transaction_date'] = pd.to_datetime(df['transaction_date'])
 
-            # Sort before subsequent operations (Corrected)
             df = df.sort_values(by=['user_id', 'transaction_date', 'transaction_amount']) 
 
             # Calculates the time and amount differences between transactions
-            df_sorted = df # No need for a new variable, the data is already sorted
+            df_sorted = df
             df_sorted['time_diff'] = df_sorted.groupby('user_id')['transaction_date'].diff()
             df_sorted['amount_diff'] = df_sorted.groupby('user_id')['transaction_amount'].diff()
 
